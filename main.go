@@ -31,7 +31,7 @@ type Edge struct {
 var jobs = make(chan Edge, 10)
 
 
-func get_href(t html.Token, curr_url string) (ok bool, href string){
+func get_href(t html.Token) (ok bool, href string){
 		for _, a := range t.Attr {
 			if a.Key == "href" {
 				href = a.Val
@@ -76,7 +76,7 @@ func get_hrefs(url string) (error, []string) {
 
 			isAnchor := t.Data == "a"
 			if isAnchor{
-				ok, href := get_href(t, url)
+				ok, href := get_href(t)
 				if !ok{
 					continue
 				}
