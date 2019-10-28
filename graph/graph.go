@@ -6,33 +6,36 @@ import (
 )
 
 type Node struct{
-	name string
-
+	Name string
 }
 
 func (n *Node) String() string{
-	return fmt.Sprintf("%v", n.name)
+	return fmt.Sprintf("%v", n.Name)
 }
 
 type Graph struct {
-	nodes []*Node
-	edges map[Node] []*Node
+	EntryNode Node
+	nodes     map[Node] error
+	Edges     map[Node] []*Node
 	 sync.RWMutex
 }
 
 
-func (g *Graph) AddNode(n *Node){
+func (g *Graph) AddNode(n Node){
 	g.Lock()
-	g.nodes = append(g.nodes, n)
+	if g.nodes == nil{
+		g.nodes = make(map[Node] error)
+	}
+	g.nodes[n] = nil
 	g.Unlock()
 }
 
 func (g *Graph) AddEdge(fromNode, toNode *Node){
 	g.Lock()
-	if g.edges == nil{
-		g.edges = make(map[Node] []*Node)
+	if g.Edges == nil{
+		g.Edges = make(map[Node] []*Node)
 	}
-	g.edges[*fromNode] = append(g.edges[*fromNode], toNode)
+	g.Edges[*fromNode] = append(g.Edges[*fromNode], toNode)
 	g.Unlock()
 }
 
@@ -41,9 +44,9 @@ func (g *Graph) AddEdge(fromNode, toNode *Node){
 func (g *Graph) String() {
 	g.RLock()
 	s := ""
-	for i := 0; i < len(g.nodes); i++ {
-		s += g.nodes[i].String() + " -> "
-		near := g.edges[*g.nodes[i]]
+	for k, _ :=range g.nodes{
+		s += k.String() + " -> "
+		near := g.Edges[k]
 		for j := 0; j < len(near); j++ {
 			s += near[j].String() + " "
 		}

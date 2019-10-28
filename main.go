@@ -1,6 +1,7 @@
 package main
 
 import (
+	"./graph"
 	"errors"
 	"fmt"
 	"golang.org/x/net/html"
@@ -22,13 +23,8 @@ type urlType struct {
 	sync.Mutex
 }
 
-type Edge struct {
-	url_start string
-	url_end string
-}
 
 
-var jobs = make(chan Edge, 10)
 
 
 func get_href(t html.Token) (ok bool, href string){
@@ -81,70 +77,74 @@ func get_hrefs(url string) (error, []string) {
 					continue
 				}
 				urls = append(urls, href)
-				//fmt.Println(href)
 			}
 		}
 	}
 }
 var loading = errors.New("url load in progress")
 
-func crawl(url string, depth int, ch chan Edge){
+func crawl(currentUrl string, depth int, globalGraph *graph.Graph,wg *sync.WaitGroup){
+	defer wg.Done()
+	urlNode := graph.Node{Name: currentUrl}
+	globalGraph.AddNode(urlNode)
+
 	if depth <= 0{
-		//fmt.Println("Done", url)
 		return
 	}
 
 	fetched.Lock()
-	if _, ok := fetched.m[url]; ok {
+	if _, ok := fetched.m[currentUrl]; ok {
 		fetched.Unlock()
 		return
 	}
 
-	fetched.m[url] = loading
+	fetched.m[currentUrl] = loading
 	fetched.Unlock()
 
-	err, urls := get_hrefs(url)
+	err, urls := get_hrefs(currentUrl)
 
 	// And update the status in a synced zone.
 	fetched.Lock()
-	fetched.m[url] = err
+	fetched.m[currentUrl] = err
 	fetched.Unlock()
 
 	if err != nil {
-		//fmt.Printf("<- Error on %v: %v\n", url, err)
+		fmt.Printf("<- Error on %v: %v\n", currentUrl, err)
 		return
 	}
-	//fmt.Printf("Found: %s\n", url)
-	done := make(chan bool)
 	for _, u := range urls {
+		toNode := graph.Node{Name:u}
+		globalGraph.AddNode(toNode)
+		globalGraph.AddEdge(&urlNode, &toNode)
 		//fmt.Printf("-> Crawling child %v/%v of %v : %v.\n", i, len(urls), url, u)
-		go func(url string) {
-			crawl(url, depth-1, ch)
-			done <- true
-		}(u)
+		wg.Add(1)
+		go crawl(u, depth-1, globalGraph, wg)
 	}
-	for _, u := range urls {
-		//fmt.Printf("<- [%v] %v/%v Waiting for child %v.\n", url, i, len(urls), u)
-		newEdge := Edge{url, u}
-		ch <- newEdge
-		<-done
-	}
+
 	//fmt.Printf("<- Done with %v\n", url)
 }
 
 
 func main(){
 
+	var globalGraph graph.Graph
+	var wg sync.WaitGroup
+
 	url_string := "https://golang.org/"
+	entryNode := graph.Node{Name: url_string}
+	globalGraph.EntryNode = entryNode
 
-	go func(url string) {
-		crawl(url, 3, jobs)
-		close(jobs)
-	}(url_string)
+	crawl(url_string, 3, &globalGraph, &wg)
 
-	for pair := range jobs {
-		fmt.Println(pair.url_start, pair.url_end)
-	}
+	wg.Wait()
+	fmt.Printf("first url has %d edges \n", len(globalGraph.Edges[entryNode]))
+
+	globalGraph.Traverse(func(n *graph.Node) {
+		fmt.Printf("%v\n", n)
+	})
+
+
+
 }
 
 
