@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"golang.org/x/net/html"
+	"io"
 	"net/http"
 	"strings"
 	"sync"
@@ -14,16 +15,6 @@ var fetched = struct {
 	m map[string]error
 	sync.Mutex
 }{m: make(map[string]error)}
-
-
-
-type urlType struct {
-	url_name string
-	m map[string]error
-	sync.Mutex
-}
-
-
 
 
 
@@ -42,9 +33,7 @@ func get_href(t html.Token) (ok bool, href string){
 	}
 
 
-
-func get_hrefs(url string) (error, []string) {
-	urls := make([]string, 0)
+func get_html_body(url string) io.ReadCloser{
 	resp, err := http.Get(url)
 	defer func() {
 		if r := recover(); r != nil {
@@ -54,11 +43,15 @@ func get_hrefs(url string) (error, []string) {
 	if err != nil {
 		panic(err)
 	}
-	// reads html as a slice of bytes
 	html_body := resp.Body
-	if err != nil {
-		panic(err)
-	}
+	return html_body
+}
+
+
+func get_hrefs(url string) (error, []string) {
+	urls := make([]string, 0)
+	// reads html as a slice of bytes
+	html_body := get_html_body(url)
 
 	z := html.NewTokenizer(html_body)
 	for {
